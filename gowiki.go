@@ -6,19 +6,53 @@ import (
 	"fmt"
 	"database/sql"
 	"github.com/go-sql-driver/mysql"
+	"net/http"
+	"html/template"
+	"strconv"
 )
 
 type Page struct {
 	ID int64
 	Title string
-	Body []byte
+	Body string
 	Author string
 }
 
 // Declare a `db` variable of type *sql.DB
 var db *sql.DB
 
+func loadPage(id int64) (*Page, error) {
+	p := &Page{}
+	row := db.QueryRow("SELECT id, title, body, author FROM page WHERE id = ?", id)
+	err := row.Scan(&p.ID, &p.Title, &p.Body, &p.Author)
+	switch {
+	case err == sql.ErrNoRows:
+		return nil, fmt.Errorf("loadPage: No page with id %d", id)
+	case err != nil:
+		return nil, fmt.Errorf("loadPage: id %d: %v", id, err)
+	default:
+		return p, nil
+	}
+}
+
+func renderTemplate(tmpl string, w http.ResponseWriter, p *Page) {
+	t, _ := template.ParseFiles(tmpl + ".html")
+	t.Execute(w, p)
+}
+
+func viewHandler(w http.ResponseWriter, r *http.Request) {
+	// Convert string to int
+	id, _ := strconv.Atoi(r.URL.Path[len("/view/"):])
+	p, err := loadPage(int64(id))
+	if err != nil {
+		log.Fatal(err)
+	}
+	renderTemplate("view", w, p)
+}
+
 func main() {
+	// Database
+
 	// Configure a database connection
 	cfg := mysql.Config{
 		User: os.Getenv("DBUSER"),
@@ -41,4 +75,9 @@ func main() {
 		log.Fatal(pingErr)
 	}
 	fmt.Println("Connected to MySQL")
+	
+	// Web Server
+
+	http.HandleFunc("/view/", viewHandler)
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
