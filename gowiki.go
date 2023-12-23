@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"github.com/go-sql-driver/mysql"
 	"net/http"
+	"github.com/gorilla/mux"
 	"html/template"
 	"strconv"
 )
@@ -41,8 +42,10 @@ func renderTemplate(tmpl string, w http.ResponseWriter, p *Page) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
 	// Convert string to int
-	id, _ := strconv.Atoi(r.URL.Path[len("/view/"):])
+	id, _ := strconv.Atoi(vars["id"])
+	log.Printf("viewHandler: Received view request for id %v\n", id)
 	p, err := loadPage(int64(id))
 	if err != nil {
 		log.Fatal(err)
@@ -77,7 +80,7 @@ func main() {
 	fmt.Println("Connected to MySQL")
 	
 	// Web Server
-
-	http.HandleFunc("/view/", viewHandler)
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	r := mux.NewRouter()
+	r.HandleFunc("/view/{id:[0-9]+}", viewHandler)
+	log.Fatal(http.ListenAndServe(":8083", r))
 }
